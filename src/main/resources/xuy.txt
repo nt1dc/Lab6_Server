@@ -1,0 +1,13 @@
+add
+1
+1
+1
+1
+DISTANCE_EDUCATION
+THIRD
+1
+10 10 2002
+1
+1
+1
+execute_script C:\Users\1\Desktop\did_iside\src\main\resources\xuy.txt
