@@ -9,6 +9,7 @@ import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.Semaphore;
 
 /**
  * Main class for server, connect and send
@@ -21,7 +22,6 @@ public class Server {
     private ObjectInputStream ois;
     private ObjectOutputStream ous;
     Commander commander;
-
     public Server(int in_port, int in_timeout, String filePath){
         port = in_port;
         timeout = in_timeout;
@@ -48,6 +48,7 @@ public class Server {
             Main.logger.fatal("Порт '" + port + "' находится за пределами возможных значений");
             return false;
         }catch (IOException exception) {
+            exception.printStackTrace();
             Main.logger.fatal("Произошла ошибка при попытке использовать порт");
             return false;
         }

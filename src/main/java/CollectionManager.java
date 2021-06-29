@@ -84,7 +84,7 @@ public class CollectionManager {
      * @param ans
      */
     public void help(AnswerMsg ans) {
-        File helpFile = new File("C:\\Users\\1\\Desktop\\server\\src\\main\\java\\help.txt");
+        File helpFile = new File("help.txt");
         Scanner scanner = null;
         try {
             scanner = new Scanner(helpFile);

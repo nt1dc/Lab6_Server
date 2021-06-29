@@ -1,16 +1,18 @@
 import messages.AnswerMsg;
 import messages.CommandMsg;
+import messages.Status;
 
 import java.io.*;
 import java.util.*;
+
 
 public class Commander {
     private final ArrayList<String> execute_Files = new ArrayList<>();
     private final CollectionManager manager;
     private String userCommand;
-
-    private String[] finalUserCommand;
+    private Boolean run;
     private final String[] history = new String[6];
+    private String[] finalUserCommand;
 
     {
         userCommand = "";
@@ -25,42 +27,61 @@ public class Commander {
      * а в дальнейшем мб и вуза =/
      */
 
-//    private void execute_script(String path) {
-//
-//        if (execute_Files.contains(path)) {
-//            System.out.println("Looping " + "\n" +
-//                    "Going to intensive mod ");
-//            try {
-//                execute_Files.clear();
-//                interactiveMod(commandMsg, answerMsg);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//
-//        File file = new File(path);
-//        try (Scanner exScanner = new Scanner(file)) {
-//            execute_Files.add(path);
-//
-//            while (!userCommand.equals("exit")) {
-//                try {
-//                    userCommand = exScanner.nextLine();
-//
-//                } catch (NoSuchElementException e) {
-//                    try {
-//                        execute_Files.clear();
-//                        interactiveMod(commandMsg, answerMsg);
-//                    } catch (IOException ioException) {
-//                        ioException.printStackTrace();
-//                    }
-//                }
-//                finalUserCommand = userCommand.trim().split(" ", 2);
-//                start();
-//            }
-//        } catch (FileNotFoundException e) {
-//            System.out.println("File not found");
-//        }
-//    }
+
+    private void execute_script(CommandMsg command, AnswerMsg ans) {
+        if (execute_Files.contains(command.getCommandStringArgument())) {
+            ans.AddErrorMsg("Looping " + "\n" +
+                    "Going to intensive mod ");
+            ans.AddStatus(Status.ERROR);
+            execute_Files.clear();
+
+        } else {
+            run = true;
+            File file = new File(command.getCommandStringArgument());
+            try (Scanner exScanner = new Scanner(file)) {
+                execute_Files.add(command.getCommandStringArgument());
+
+//                CommandMsg commandMsg = new CommandMsg(exScanner.nextLine().trim().split(" ", 2)[0], exScanner.nextLine().trim().split(" ", 2)[1], studyGroup);
+                while (exScanner.hasNextLine() && !finalUserCommand[0].equals("exit")) {
+                    GroupBuilder groupBuilder = new GroupBuilder(exScanner);
+                    StudyGroup studyGroup = null;
+                    userCommand = exScanner.nextLine();
+                    finalUserCommand = userCommand.trim().split(" ", 2);
+                    CommandMsg commandMsg = new CommandMsg(finalUserCommand[0], "", studyGroup);
+                    try {
+                        if (finalUserCommand[0].equals("update") || finalUserCommand[0].equals("remove_by_id") || finalUserCommand[0].equals("") || finalUserCommand[0].equals("execute_script") || finalUserCommand[0].equals("remove_all_by_form_of_education") || finalUserCommand[0].equals("count_by_semester_enum")) {
+                            commandMsg.setCommandStringArgument(finalUserCommand[1]);
+                        }
+                    } catch (IndexOutOfBoundsException e) {
+                        ans.AddErrorMsg("No argument");
+                        ans.AddStatus(Status.ERROR);
+                    }
+
+                    if (commandMsg.getCommandName().equals("add") | commandMsg.getCommandName().equals("add_if_min") | commandMsg.getCommandName().equals("update")) {
+                        groupBuilder.setFields();
+                        commandMsg.setCommandObjectArgument(groupBuilder.studyGropCreator());
+                    }
+                    if (execute_Files.contains(commandMsg.getCommandStringArgument()) & commandMsg.getCommandName().equals("execute_script")) {
+                        ans.AddErrorMsg("Looping " + "\n" +
+                                "Going to intensive mod ");
+                        ans.AddStatus(Status.ERROR);
+                        execute_Files.clear();
+                        run = false;
+                        break;
+                    } else {
+                        start(commandMsg, ans);
+                    }
+                }
+            } catch (
+                    FileNotFoundException e) {
+                ans.AddStatus(Status.ERROR);
+                ans.AddErrorMsg("File not found");
+            } finally {
+                ans.AddAnswer("Script done");
+            }
+        }
+
+    }
 
     /**
      * Gets command and use them
@@ -102,10 +123,10 @@ public class Commander {
                     break;
 
                 case "history":
-                    System.out.println("Last 5 commands: \n");
+                    ans.AddAnswer("Last 5 commands: \n");
                     for (int i = 0; i < 5; i++) {
                         if (history[i] != null) {
-                            System.out.println(history[i]);
+                            ans.AddAnswer(history[i]);
                         }
                     }
                     break;
@@ -121,23 +142,25 @@ public class Commander {
                 case "remove_head":
                     manager.remove_head(ans);
                     break;
-//                case "execute_script":
-//                    try {
-//                        execute_script(this.finalUserCommand[1]);
-//                    } catch (Exception e) {
-//                        System.out.println("File error");
-//                        try {
-//                            interactiveMod(commandMsg, answerMsg);
-//                        } catch (IOException ioException) {
-//                            ioException.printStackTrace();
-//                        }
-//                    }
-//                    break;
+                case "execute_script":
+                    try {
+                        execute_script(commandMsg, ans);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    break;
                 case "print_unique_semester_enum":
                     manager.print_unique_semester_enum(ans);
                     break;
+
+                case "exit":
+                    if (finalUserCommand[0].equals("exit")) {
+                        ans.AddAnswer("Exit");
+                        ans.AddStatus(Status.EXIT);
+                    }
+                    break;
                 default:
-                    if (finalUserCommand[0].equals("exit")) System.exit(0);
+
                     ans.AddAnswer("Unknown command. Use 'help' for help.");
                     for (int i = 5; i > 0; i--) {
                         history[i] = history[i - 1];
