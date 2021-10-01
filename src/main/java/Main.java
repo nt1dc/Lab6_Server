@@ -9,7 +9,6 @@ import java.util.concurrent.Semaphore;
 /**
  * Main class for server
  *
- * @author Konanykhina Antonina
  */
 public class
 Main {
