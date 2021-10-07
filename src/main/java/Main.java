@@ -18,7 +18,7 @@ Main {
     public static final int CONNECTION_TIMEOUT = 60000;
 
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
         System.out.println(InetAddress.getLocalHost());
         Semaphore semaphore= new Semaphore(2);
         

@@ -1,53 +1,50 @@
 import messages.AnswerMsg;
-import messages.CommandMsg;
-import messages.Status;
 
-
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.InetSocketAddress;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.concurrent.Semaphore;
+import java.nio.channels.*;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Main class for server, connect and send
+ * Main class for serverSocketChannel, connect and send
  */
 public class Server {
-    private int port;
-    private int timeout;
-    private ServerSocketChannel socketChannel;
-    private SocketChannel clientChanel;
-    private ObjectInputStream ois;
-    private ObjectOutputStream ous;
-    Commander commander;
-    public Server(int in_port, int in_timeout, String filePath){
+    Queue<Attachment> executeQue = new PriorityQueue<>();
+    Queue<Attachment> sendQue = new PriorityQueue<>();
+    private final int port;
+    private final int timeout;
+    private ServerSocketChannel serverSocketChannel;
+
+
+    //    private ConnectionAccepter connectionAccepter;
+    private Iterator<SelectionKey> iterator;
+
+
+    public Server(int in_port, int in_timeout, String filePath) throws IOException {
         port = in_port;
         timeout = in_timeout;
-        try {
-            commander = new Commander(new CollectionManager(filePath));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     /**
-     * Open and set server
+     * Open and set serverSocketChannel
+     *
      * @return All right or not
      */
-    private boolean openSocket(){
+    private boolean openSocket(Selector selector) {
         try {
             Main.logger.info("Начинаю запуск сервера");
-            socketChannel = ServerSocketChannel.open();
-            socketChannel.socket().bind(new InetSocketAddress(port));
-            socketChannel.socket().setSoTimeout(timeout);
+            serverSocketChannel = ServerSocketChannel.open();
+            serverSocketChannel.socket().bind(new InetSocketAddress(port));
+            serverSocketChannel.configureBlocking(false);
+            serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
             Main.logger.info("Сервер успешно запущен");
             return true;
         } catch (IllegalArgumentException exception) {
             Main.logger.fatal("Порт '" + port + "' находится за пределами возможных значений");
             return false;
-        }catch (IOException exception) {
+        } catch (IOException exception) {
             exception.printStackTrace();
             Main.logger.fatal("Произошла ошибка при попытке использовать порт");
             return false;
@@ -55,127 +52,125 @@ public class Server {
     }
 
     /**
-     * Close server in end of work
+     * Close serverSocketChannel in end of work
      */
-    private  void closeSocket(){
-        try{
+    private void closeSocket() {
+        try {
             Main.logger.info("Пытаюсь закрыть сервер");
-            socketChannel.close();
+            serverSocketChannel.close();
             Main.logger.info("Сервер успешно закрыт");
         } catch (IOException exception) {
             Main.logger.error("Ошибка при закрытии сервера");
         }
     }
 
-    /**
-     * Wait for client and set connection with him
-     */
-    private void startTransmission(){
-        try {
-            Main.logger.info("Вхожу в ожидание соединения");
-            clientChanel = socketChannel.accept();
-            Main.logger.info("Получаю разреение на чтение и запись");
-            ois = new ObjectInputStream(clientChanel.socket().getInputStream());
-            ous = new ObjectOutputStream(clientChanel.socket().getOutputStream());
-            Main.logger.info("Разрешение на чтение и запись получено");
-            Main.logger.info("Уcтановлено соединение с клиентом");
-        } catch (IOException exception) {
-            Main.logger.error("Ошибка подключения к клиенту");
-        }
-    }
 
-    /**
-     * Read object from client
-     * @return Object witch was send
-     */
-    private Object readObj(){
-        try{
-            Main.logger.info("Начинаю чтение объекта");
-            Object obj = ois.readObject();
-            Main.logger.info("Объект получен");
-            return obj;
-        } catch (IOException exception) {
-            exception.printStackTrace();
-            Main.logger.error("Разрыв соеденения");
-        } catch (ClassNotFoundException exception) {
-            Main.logger.error("Ошибка получения объекта");
-        }
-        return null;
-    }
+    private static boolean flag = true;
 
-    /**
-     * Send answer to user
-     * @param answerMsg Message
-     * @return All right or not
-     */
-    private boolean sendAnswer(AnswerMsg answerMsg){
-        try{
-            Main.logger.info("Отправляю ответ: " + answerMsg.getMessage());
-            ous.writeObject(answerMsg);
-            ous.flush();
-            Main.logger.info("Ответ отправлен");
-            return true;
-        } catch (IOException exception) {
-            Main.logger.error("Разрыв соеденения");
-        }
-        return false;
-    }
 
     /**
      * End transmission with current user if error happened (need wait next)
      */
-    private void endTransmission(){
-        try {
-            Main.logger.info("Закрываю соединение");
-            clientChanel.close();
-            ois.close();
-            ous.close();
-            Main.logger.info("Соединение успешно закрыто");
-        } catch (IOException exception) {
-            Main.logger.error("Ошибка закрытия соеденения");
-        }
-    }
+//    private void endTransmission() {
+//        try {
+//            Main.logger.info("Закрываю соединение");
+//            client.close();
+//            ois.close();
+//            ous.close();
+//            Main.logger.info("Соединение успешно закрыто");
+//        } catch (IOException exception) {
+//            Main.logger.error("Ошибка закрытия соеденения");
+//        }
+//    }
 
     /**
      * Main run class, read client, execute and answer
      */
-    public void run() {
-        if (!openSocket())
-            return;
-        boolean working = true;
-        boolean reconect = true;
-        while (working) {
-            if (reconect){
-                startTransmission();
-                reconect = false;
-            }
-            Object obj = readObj();
 
-            if (obj == null){
-                System.out.println("blya");
-                endTransmission();
-                reconect = true;
-                continue;
-            }
+    public void run() throws IOException, ClassNotFoundException {
+        Selector selector = Selector.open();
+        openSocket(selector);
+        boolean work = true;
+        ExecutorService read = Executors.newCachedThreadPool();
+        ExecutorService send = Executors.newCachedThreadPool();
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        SocketChannel client = null;
+        Stack<SelectionKey> processingSelectionKeys = new Stack<>();
 
-            CommandMsg commandMsg = (CommandMsg) obj;
-            AnswerMsg answerMsg = new AnswerMsg();
-//            System.out.println(commandMsg.getCommandObjectArgument().getClass());
-            commander.start(commandMsg, answerMsg);
-            if (!sendAnswer(answerMsg)){
-                endTransmission();
-                reconect = true;
-                continue;
+
+        while (true) {
+            try {
+//            int readyChannels = selector.select();
+                if (selector.selectNow() == 0) {
+                    Set<SelectionKey> readyKeys = selector.selectedKeys();
+                    Iterator<SelectionKey> iterator = readyKeys.iterator();
+                    while (iterator.hasNext()) {
+                        SelectionKey key = iterator.next();
+                        iterator.remove();
+                        if (key.isAcceptable()) {
+                            SocketChannel socketChannel = serverSocketChannel.accept();
+                            socketChannel.configureBlocking(false);
+                            socketChannel.register(selector, SelectionKey.OP_READ);
+                            Main.logger.info("Some bitard has connected with address" + socketChannel.getRemoteAddress());
+                        } else if (key.isReadable()) {
+                            Iterator iterator1 = processingSelectionKeys.iterator();
+                            boolean keyIsAlreadyInwork = false;
+
+                            while (iterator1.hasNext()) {
+                                if (key.equals(iterator1.next())) {
+                                    keyIsAlreadyInwork = true;
+                                    System.out.println("я в работе");
+                                    break;
+                                }
+                            }
+                            if (!keyIsAlreadyInwork) {
+                                System.out.println("читаю");
+                                SocketChannel socketChannel = (SocketChannel) key.channel();
+                                processingSelectionKeys.add(key);
+                                read.execute(new Reader(key, socketChannel, executeQue));
+                                processingSelectionKeys.remove(key);
+                            }
+                        }
+                    }
+                }
+                while (!executeQue.isEmpty()) {
+                    System.out.println("пришел на выполнение");
+                    Attachment attachment = executeQue.poll();
+                    executor.execute(new Commander(attachment, sendQue));
+                }
+                while (!sendQue.isEmpty()) {
+                    Attachment attachment = sendQue.poll();
+                    send.execute(new Sender(attachment));
+                }
+            } catch (CancelledKeyException e) {
             }
-            if (answerMsg.getStatus() == Status.EXIT)
-                working = false;
         }
-        Main.logger.info("Конец завершение работы");
-        Main.logger.info("Сохранение коллекции");
-        AnswerMsg answerMsg = new AnswerMsg();
-        //commandManager.executeCommand(new CommandMsg("save", null, null), answerMsg);
-        Main.logger.info("Сохранание прошло со следующим сообщением: " + answerMsg.getMessage().trim());
-        endTransmission();
-        closeSocket();
     }
 }
+
+
+//
+//        CommandMsg commandMsg = readObj();
+//        AnswerMsg answerMsg = new AnswerMsg();
+////            System.out.println(commandMsg.getCommandObjectArgument().getClass());
+//        commander.start(commandMsg, answerMsg);
+//        if (!sendAnswer(answerMsg)) {
+//            endTransmission();
+//        }
+//        if (answerMsg.getStatus() == Status.EXIT)
+//            flag = false;
+//
+//        Main.logger.info("Конец завершение работы");
+//        Main.logger.info("Сохранение коллекции");
+//        AnswerMsg answerMsg = new AnswerMsg();
+//        //commandManager.executeCommand(new CommandMsg("save", null, null), answerMsg);
+//        Main.logger.info("Сохранание прошло со следующим сообщением: " + answerMsg.getMessage().
+//
+//                trim());
+//
+//        endTransmission();
+//
+//        closeSocket();
+
+
+

@@ -37,6 +37,11 @@ public class CollectionManager {
 
     }
 
+    public CollectionManager() {
+
+        initDate = new Date();
+    }
+
     /**
      * Loading collection from file
      */
@@ -129,6 +134,7 @@ public class CollectionManager {
 
         if (groups.size() != 0)
             for (StudyGroup group : groups) {
+                ans.getMessage();
                 ans.AddAnswer(group.toString() + "\n");
             }
         else ans.AddAnswer("Empty collection");

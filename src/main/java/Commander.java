@@ -3,30 +3,47 @@ import messages.CommandMsg;
 import messages.Status;
 
 import java.io.*;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
 import java.util.*;
 
 
-public class Commander {
+public class Commander implements Runnable {
     private final ArrayList<String> execute_Files = new ArrayList<>();
-    private final CollectionManager manager;
+    Attachment attachment;
+    private CollectionManager manager = new CollectionManager("C:\\Users\\1\\Desktop\\server\\src\\main\\java\\InputStudyGroup.xml");
     private String userCommand;
     private Boolean run;
     private final String[] history = new String[6];
     private String[] finalUserCommand;
+    private SelectionKey selectionKey;
+    private AnswerMsg answerMsg;
+    private CommandMsg commandMsg;
+    private Queue<Attachment> sendQue;
 
     {
         userCommand = "";
     }
 
-    public Commander(CollectionManager manager) {
-        this.manager = manager;
+
+
+    public Commander(Attachment attachment, Queue<Attachment> sendQue) throws IOException {
+        this.attachment=attachment;
+        answerMsg=attachment.getAnswerMsg();
+        commandMsg=attachment.getCommandMsg();
+        this.sendQue = sendQue;
     }
+
 
     /**
      * Хрень которая лишила меня сна 19.05.2021-20.05.2021
      * а в дальнейшем мб и вуза =/
      */
-
+    /**
+     * а может быть и нет, я вот сейчас пишу эту 7 лабу с 10 часов утра, сейчас уже 2 часа ночи. И понимаю какой я тупой, но это все прекольно.
+     * Надеюсь не зря писал
+     */
 
     private void execute_script(CommandMsg command, AnswerMsg ans) {
         if (execute_Files.contains(command.getCommandStringArgument())) {
@@ -87,6 +104,7 @@ public class Commander {
      * Gets command and use them
      */
     public void start(CommandMsg commandMsg, AnswerMsg ans) {
+        commandMsg.getCommandName();
         finalUserCommand = commandMsg.getCommandName().trim().split(" ", 2);
         try {
             history[5] = this.finalUserCommand[0];
@@ -186,4 +204,16 @@ public class Commander {
         result = 31 * result + Arrays.hashCode(finalUserCommand);
         return result;
     }
+
+    public AnswerMsg getAnswerMsg() {
+        return answerMsg;
+    }
+
+    @Override
+    public void run() {
+        start(commandMsg, answerMsg);
+        sendQue.add(attachment);
+    }
+
+
 }
