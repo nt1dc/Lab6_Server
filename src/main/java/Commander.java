@@ -95,7 +95,7 @@ public class Commander implements Runnable {
                     }
                 }
             } catch (
-                    FileNotFoundException e) {
+                    FileNotFoundException | SQLException e) {
                 ans.AddStatus(Status.ERROR);
                 ans.AddErrorMsg("File not found");
             } finally {
@@ -108,8 +108,14 @@ public class Commander implements Runnable {
     /**
      * Gets command and use them
      */
-    public void start(CommandMsg commandMsg, AnswerMsg ans) {
-
+    public void start(CommandMsg commandMsg, AnswerMsg ans) throws SQLException {
+        if (manager.databaseManager.checkUser(commandMsg.getUser().getUserName(), commandMsg.getUser().getPassword())) {
+            ans.AddStatus(Status.FINE);
+            System.out.println("still valid");
+        } else {
+            ans.AddStatus(Status.EXIT);
+            ans.AddErrorMsg("WTF??????????");
+        }
         finalUserCommand = commandMsg.getCommandName().trim().split(" ", 2);
         try {
             history[5] = this.finalUserCommand[0];
@@ -141,7 +147,7 @@ public class Commander implements Runnable {
 //                    manager.save(ans);
 //                    break;
                 case "remove_by_id":
-                    manager.remove_by_id(commandMsg.getCommandStringArgument(), ans);
+                    manager.remove_by_id(commandMsg.getCommandStringArgument(), ans,commandMsg.getUser());
                     break;
 
                 case "history":
@@ -230,12 +236,13 @@ public class Commander implements Runnable {
             try {
 
                 if (manager.databaseManager.checkUser(attachment.getCommandMsg().getUser().getUserName(), attachment.getCommandMsg().getUser().getPassword())) {
-                    Main.logger.info("User "+ user.getUserName()+" has authorized in db");
+                    Main.logger.info("User " + user.getUserName() + " has authorized in db");
                     attachment.getAnswerMsg().setMsg("Хорошая работа ОЛЕГ");
                 } else {
                     answerMsg.AddErrorMsg("");
                 }
             } catch (SQLException throwables) {
+                throwables.printStackTrace();
                 attachment.getAnswerMsg().AddStatus(Status.ERROR);
                 attachment.getAnswerMsg().AddErrorMsg("Ошибка при работе с БД");
             }

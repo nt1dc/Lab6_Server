@@ -23,7 +23,7 @@ public class Server {
     private Iterator<SelectionKey> iterator;
 
 
-    public Server(int in_port, int in_timeout, String filePath) throws IOException {
+    public Server(int in_port, int in_timeout) throws IOException {
         port = in_port;
         timeout = in_timeout;
     }

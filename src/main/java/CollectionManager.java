@@ -1,5 +1,6 @@
 import messages.AnswerMsg;
 import messages.Status;
+import messages.User;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -100,6 +101,7 @@ public class CollectionManager {
     public void add(StudyGroup studyGroup, AnswerMsg ans, Attachment attachment) {
 
         try {
+            System.out.println(" z tut");
             databaseManager.add(studyGroup,attachment);
             groups.add(studyGroup);
         } catch (SQLException throwables) {
@@ -202,7 +204,7 @@ public class CollectionManager {
     /**
      * Delete element of collection by id
      */
-    public void remove_by_id(String id, AnswerMsg ans) {
+    public void remove_by_id(String id, AnswerMsg ans, User user) {
         if (groups.isEmpty()) ans.AddAnswer("Empty collection");
         else
             try {
@@ -210,7 +212,10 @@ public class CollectionManager {
                 ans.AddStatus(Status.ERROR);
                 for (StudyGroup group : groups) {
                     if (group.getId().equals(removeID)) {
-                        groups.remove(group);
+                        System.out.println("da");
+                        databaseManager.remove_by_id(group,user);
+                        groups.clear();
+                        groups=databaseManager.readDB();
                         ans.AddStatus(Status.FINE);
                     }
                 }

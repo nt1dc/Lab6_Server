@@ -20,15 +20,8 @@ Main {
 
     public static void main(String[] args) throws IOException, ClassNotFoundException {
         System.out.println(InetAddress.getLocalHost());
-        Semaphore semaphore= new Semaphore(2);
-        
-        if (args.length > 0) {
-            Server server = new Server(PORT, CONNECTION_TIMEOUT, args[0]);
-            server.run();
-        } else {
-            System.out.println("File path should be passed to program by using: command line argument. \n\n");
-            System.exit(0);
-        }
+        Server server = new Server(PORT, CONNECTION_TIMEOUT);
+        server.run();
 
     }
 
