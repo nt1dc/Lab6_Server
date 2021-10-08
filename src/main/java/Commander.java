@@ -1,18 +1,20 @@
 import messages.AnswerMsg;
 import messages.CommandMsg;
 import messages.Status;
+import messages.User;
 
 import java.io.*;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.sql.SQLException;
 import java.util.*;
 
 
 public class Commander implements Runnable {
     private final ArrayList<String> execute_Files = new ArrayList<>();
     Attachment attachment;
-    private CollectionManager manager = new CollectionManager("C:\\Users\\1\\Desktop\\server\\src\\main\\java\\InputStudyGroup.xml");
+    private CollectionManager manager;
     private String userCommand;
     private Boolean run;
     private final String[] history = new String[6];
@@ -20,6 +22,7 @@ public class Commander implements Runnable {
     private SelectionKey selectionKey;
     private AnswerMsg answerMsg;
     private CommandMsg commandMsg;
+    private User user;
     private Queue<Attachment> sendQue;
 
     {
@@ -27,12 +30,14 @@ public class Commander implements Runnable {
     }
 
 
-
-    public Commander(Attachment attachment, Queue<Attachment> sendQue) throws IOException {
-        this.attachment=attachment;
-        answerMsg=attachment.getAnswerMsg();
-        commandMsg=attachment.getCommandMsg();
+    public Commander(Attachment attachment, Queue<Attachment> sendQue, CollectionManager collectionManager) throws IOException {
+        manager = collectionManager;
+        this.attachment = attachment;
+        answerMsg = attachment.getAnswerMsg();
+        commandMsg = attachment.getCommandMsg();
+        this.user = attachment.getCommandMsg().getUser();
         this.sendQue = sendQue;
+
     }
 
 
@@ -64,7 +69,7 @@ public class Commander implements Runnable {
                     StudyGroup studyGroup = null;
                     userCommand = exScanner.nextLine();
                     finalUserCommand = userCommand.trim().split(" ", 2);
-                    CommandMsg commandMsg = new CommandMsg(finalUserCommand[0], "", studyGroup);
+                    CommandMsg commandMsg = new CommandMsg(finalUserCommand[0], "", studyGroup, user);
                     try {
                         if (finalUserCommand[0].equals("update") || finalUserCommand[0].equals("remove_by_id") || finalUserCommand[0].equals("") || finalUserCommand[0].equals("execute_script") || finalUserCommand[0].equals("remove_all_by_form_of_education") || finalUserCommand[0].equals("count_by_semester_enum")) {
                             commandMsg.setCommandStringArgument(finalUserCommand[1]);
@@ -104,7 +109,7 @@ public class Commander implements Runnable {
      * Gets command and use them
      */
     public void start(CommandMsg commandMsg, AnswerMsg ans) {
-        commandMsg.getCommandName();
+
         finalUserCommand = commandMsg.getCommandName().trim().split(" ", 2);
         try {
             history[5] = this.finalUserCommand[0];
@@ -112,7 +117,6 @@ public class Commander implements Runnable {
                 history[i] = history[i + 1];
             }
             switch (this.finalUserCommand[0]) {
-
                 case "":
                     break;
                 case "help":
@@ -122,7 +126,7 @@ public class Commander implements Runnable {
                     manager.info(ans);
                     break;
                 case "add":
-                    manager.add((StudyGroup) commandMsg.getCommandObjectArgument(), ans);
+                    manager.add((StudyGroup) commandMsg.getCommandObjectArgument(), ans, attachment);
                     break;
                 case "show":
                     manager.show(ans);
@@ -211,9 +215,40 @@ public class Commander implements Runnable {
 
     @Override
     public void run() {
-        start(commandMsg, answerMsg);
+        attachment.getAnswerMsg().AddStatus(Status.FINE);
+        if (commandMsg.getCommandName().equals("registration")) {
+            try {
+                manager.databaseManager.register(commandMsg.getUser().getUserName(), commandMsg.getUser().getPassword());
+                attachment.getAnswerMsg().AddStatus(Status.FINE);
+            } catch (SQLException throwables) {
+                answerMsg.AddStatus(Status.ERROR);
+                answerMsg.AddErrorMsg("Такой юзер уже имеется");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else if (commandMsg.getCommandName().equals("authentication")) {
+            try {
+
+                if (manager.databaseManager.checkUser(attachment.getCommandMsg().getUser().getUserName(), attachment.getCommandMsg().getUser().getPassword())) {
+                    Main.logger.info("User "+ user.getUserName()+" has authorized in db");
+                    attachment.getAnswerMsg().setMsg("Хорошая работа ОЛЕГ");
+                } else {
+                    answerMsg.AddErrorMsg("");
+                }
+            } catch (SQLException throwables) {
+                attachment.getAnswerMsg().AddStatus(Status.ERROR);
+                attachment.getAnswerMsg().AddErrorMsg("Ошибка при работе с БД");
+            }
+        } else {
+            try {
+                if (manager.databaseManager.checkUser(attachment.getCommandMsg().getUser().getUserName(), attachment.getCommandMsg().getUser().getPassword())) {
+                    start(commandMsg, answerMsg);
+                }
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+        }
         sendQue.add(attachment);
     }
-
 
 }

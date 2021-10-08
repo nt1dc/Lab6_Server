@@ -1,86 +1,62 @@
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import messages.AnswerMsg;
 import messages.Status;
 
-import javax.management.modelmbean.XMLParseException;
-import javax.xml.stream.XMLStreamException;
 import java.io.*;
-import java.util.Date;
-import java.util.PriorityQueue;
-import java.util.Queue;
-import java.util.Scanner;
+import java.sql.SQLException;
+import java.util.*;
 
 public class CollectionManager {
 
-    private Queue<StudyGroup> groups;
+    private PriorityQueue<StudyGroup> groups;
     private final Date initDate;
-    String savePath;
-
-    public CollectionManager(String collectionPath) throws IOException {
-        if (collectionPath == null)
-            throw new FileNotFoundException("File path should be passed to program by using: command line argument");
-        try {
-            savePath = collectionPath;
-            load(collectionPath);
-        } catch (XMLParseException | XMLStreamException | IOException exception) {
-            System.out.println("Error while parsing from file");
-            System.exit(0);
-        } catch (Exception e) {
-            System.out.println("Something gone wrong with file");
-            System.exit(0);
-        }
-
-        this.initDate = new Date();
-
-
-    }
+    DatabaseManager databaseManager;
 
     public CollectionManager() {
-
-        initDate = new Date();
+        this.initDate = new Date();
     }
+
 
     /**
      * Loading collection from file
      */
-    public void load(String collectionPath) throws IOException, XMLParseException, XMLStreamException {
-        groups = new PriorityQueue<>();
-        File file = new File(collectionPath);
-        ObjectMapper xmlMapper = new XmlMapper();
-
-        String xml = inputStreamToString(new FileInputStream(file));
-        groups = xmlMapper.readValue(xml, new TypeReference<PriorityQueue<StudyGroup>>() {
-        });
+    public void load() {
+        databaseManager = new DatabaseManager();
+        databaseManager.connect();
+        try {
+            groups= (databaseManager.readDB());
+        } catch (SQLException throwables) {
+            Main.logger.error("ошибка при загрузке коллекции");
+        }
         if (!groups.isEmpty()) {
-            System.out.println("Collection created");
-        } else System.out.println("Empty collection");
+            Main.logger.info("Collection created");
+        } else {
+            Main.logger.info("Empty collection");
+        }
     }
 
     /**
      * HelpMethod for  load
      * BufferReading
      */
-    private String inputStreamToString(InputStream is) {
-        StringBuilder sb = new StringBuilder();
-        String line = "";
-        BufferedReader br = new BufferedReader(new InputStreamReader(is));
-        while (true) {
-            try {
-                if ((line = br.readLine()) == null) break;
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            sb.append(line);
-        }
-        try {
-            br.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return sb.toString();
-    }
+//    private String inputStreamToString(InputStream is) {
+//        StringBuilder sb = new StringBuilder();
+//        String line = "";
+//        BufferedReader br = new BufferedReader(new InputStreamReader(is));
+//        while (true) {
+//            try {
+//                if ((line = br.readLine()) == null) break;
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            sb.append(line);
+//        }
+//        try {
+//            br.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//        return sb.toString();
+//    }
 
     /**
      * Show Commands
@@ -121,9 +97,16 @@ public class CollectionManager {
     }
 
 
-    public void add(StudyGroup studyGroup, AnswerMsg ans) {
-        studyGroup.toString();
-        groups.add(studyGroup);
+    public void add(StudyGroup studyGroup, AnswerMsg ans, Attachment attachment) {
+
+        try {
+            databaseManager.add(studyGroup,attachment);
+            groups.add(studyGroup);
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            ans.AddErrorMsg("ERROR WITH ADDING ELEMENT");
+            ans.AddStatus(Status.ERROR);
+        }
         ans.AddAnswer("Element was added");
     }
 
@@ -288,7 +271,7 @@ public class CollectionManager {
                 ans.AddErrorMsg("ono slomalos");
             }
 
-        } else{
+        } else {
             ans.AddStatus(Status.ERROR);
             ans.AddErrorMsg("Entered incorrect semester");
         }

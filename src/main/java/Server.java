@@ -3,6 +3,7 @@ import messages.AnswerMsg;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -88,6 +89,13 @@ public class Server {
      */
 
     public void run() throws IOException, ClassNotFoundException {
+        CollectionManager collectionManager = new CollectionManager();
+        collectionManager.load();
+//        try {
+////            collectionManager.databaseManager.register("АНТОХА","S");
+//        } catch (SQLException throwables) {
+//            throwables.printStackTrace();
+//        }
         Selector selector = Selector.open();
         openSocket(selector);
         boolean work = true;
@@ -119,12 +127,10 @@ public class Server {
                             while (iterator1.hasNext()) {
                                 if (key.equals(iterator1.next())) {
                                     keyIsAlreadyInwork = true;
-                                    System.out.println("я в работе");
                                     break;
                                 }
                             }
                             if (!keyIsAlreadyInwork) {
-                                System.out.println("читаю");
                                 SocketChannel socketChannel = (SocketChannel) key.channel();
                                 processingSelectionKeys.add(key);
                                 read.execute(new Reader(key, socketChannel, executeQue));
@@ -134,9 +140,8 @@ public class Server {
                     }
                 }
                 while (!executeQue.isEmpty()) {
-                    System.out.println("пришел на выполнение");
                     Attachment attachment = executeQue.poll();
-                    executor.execute(new Commander(attachment, sendQue));
+                    executor.execute(new Commander(attachment, sendQue,collectionManager));
                 }
                 while (!sendQue.isEmpty()) {
                     Attachment attachment = sendQue.poll();
